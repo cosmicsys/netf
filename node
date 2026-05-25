@@ -1,0 +1,12 @@
+#!/data/data/com.termux/files/usr/bin/bash
+[ -n "$LD_PRELOAD" ] && export _OA_ORIG_LD_PRELOAD="$LD_PRELOAD"
+unset LD_PRELOAD
+_OA_COMPAT="$HOME/.openclaw-android/patches/glibc-compat.js"
+if [ -f "$_OA_COMPAT" ]; then
+    case "${NODE_OPTIONS:-}" in
+        *"$_OA_COMPAT"*) ;;
+        *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }-r $_OA_COMPAT" ;;
+    esac
+fi
+# Fixed: We don't move leading flags to NODE_OPTIONS because it breaks Node 22
+exec "/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1" --library-path "/data/data/com.termux/files/usr/glibc/lib" "/data/data/com.termux/files/home/.openclaw-android/node/bin/node.real" "$@" 
