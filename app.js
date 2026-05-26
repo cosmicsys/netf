@@ -51,6 +51,18 @@ async function fetchCategory(type, containerId, subType = 'new') {
     }
 }
 
+function updateHero(item, type) {
+    const heroTitle = document.getElementById('heroTitle');
+    const heroDescription = document.getElementById('heroDescription');
+    const id = item.imdb_id || item.tmdb_id;
+    
+    heroTitle.innerText = `Featured ${type === 'movie' ? 'Movie' : 'Show'}: ${id}`;
+    heroDescription.innerText = `Stream the latest ${type} in ${item.quality || 'HD'} quality directly on NETF using VidSrc infrastructure.`;
+    
+    const playBtn = document.querySelector('.play-btn');
+    playBtn.onclick = () => openPlayer(id, type);
+}
+
 function renderMovies(movies, containerId, type) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
