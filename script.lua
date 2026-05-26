@@ -161,6 +161,32 @@ VisualsTab:CreateSlider({
 })
 
 -- UTILITY
+local desyncEnabled = false
+UtilityTab:CreateToggle({
+   Name = "Desync",
+   CurrentValue = false,
+   Flag = "DesyncToggle",
+   Callback = function(Value)
+      desyncEnabled = Value
+      if desyncEnabled then
+         task.spawn(function()
+            while desyncEnabled do
+               local char = game.Players.LocalPlayer.Character
+               local hrp = char and char:FindFirstChild("HumanoidRootPart")
+               if hrp then
+                  local oldVelocity = hrp.Velocity
+                  hrp.Velocity = Vector3.new(0, -500, 0) -- Vertical desync
+                  task.wait()
+                  hrp.Velocity = oldVelocity
+               end
+               task.wait(0.1)
+            end
+         end)
+         Rayfield:Notify({Title = "Desync Active", Content = "Your hitbox is now desynchronized from the server.", Duration = 3})
+      end
+   end,
+})
+
 UtilityTab:CreateButton({
    Name = "Anti-AFK",
    Callback = function()
