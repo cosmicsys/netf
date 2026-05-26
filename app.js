@@ -1,10 +1,9 @@
 const VIDSRC_BASE = "https://vidsrc.fyi";
 const VIDSRC_API = "https://vidsrc.fyi/vapi";
-
-// TMDB API Config (Using a common public key for demo purposes, or user can replace)
 const TMDB_KEY = "8265b3e0965444b045e054173815048d";
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const TMDB_IMG = "https://image.tmdb.org/t/p/w500";
+const TMDB_BACKDROP = "https://image.tmdb.org/t/p/original";
 
 // DOM Elements
 const navbar = document.getElementById('navbar');
@@ -22,30 +21,108 @@ const heroSection = document.getElementById('hero');
 let currentPlayerId = "";
 let currentPlayerType = "movie";
 
-// Search on Enter key
-searchInput.addEventListener("keypress", function(event) {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    handleSearch();
-  }
-});
-
-// Scroll Effect for Navbar
-window.addEventListener('scroll', () => {
-    if (window.scrollY > 100) {
-        navbar.classList.add('scrolled');
-    } else {
-        navbar.classList.remove('scrolled');
-    }
-});
-
 // Initialization
 async function init() {
-    await fetchCategory('movie', 'new-releases');
-    await fetchCategory('movie', 'recently-added-movies', 'add');
-    await fetchCategory('tv', 'latest-tv', 'new');
+    // Initial fetch to get IDs from VidSrc, then we'll enrich with TMDB
+    await fetchAndEnrich('movie', 'new-releases', 'new');
+    await fetchAndEnrich('movie', 'recently-added-movies', 'add');
+    await fetchAndEnrich('tv', 'latest-tv', 'new');
+    
+    // Featured Hero - Trending Movie
+    fetchTrendingHero();
 }
 
+async function fetchTrendingHero() {
+    try {
+        const res = await fetch(`${TMDB_BASE}/trending/movie/day?api_key=${TMDB_KEY}`);
+        const data = await res.json();
+        if (data.results && data.results[0]) {
+            updateHeroUI(data.results[0]);
+        }
+    } catch (e) { console.error("Hero fetch error", e); }
+}
+
+function updateHeroUI(item) {
+    const hero = document.getElementById('hero');
+    const title = document.getElementById('heroTitle');
+    const desc = document.getElementById('heroDescription');
+    const playBtn = document.querySelector('.play-btn');
+    
+    hero.style.backgroundImage = `url(${TMDB_BACKDROP}${item.backdrop_path})`;
+    title.innerText = item.title || item.name;
+    desc.innerText = item.overview;
+    playBtn.onclick = () => openPlayer(item.id, 'movie');
+}
+
+async function fetchAndEnrich(type, containerId, subType) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    try {
+        const vRes = await fetch(`${VIDSRC_API}/${type}/${subType}`);
+        const vData = await vRes.json();
+        
+        if (vData.result) {
+            // Take first 10 for performance and enrich
+            const items = vData.result.slice(0, 12);
+            container.innerHTML = '';
+            
+            for (const item of items) {
+                const id = item.imdb_id || item.tmdb_id;
+                enrichAndAppend(id, type, container);
+            }
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function enrichAndAppend(id, type, container) {
+    try {
+        const res = await fetch(`${TMDB_BASE}/${type}/${id}?api_key=${TMDB_KEY}`);
+        const data = await res.json();
+        if (data.id) {
+            const card = createMovieCard(data, type);
+            container.appendChild(card);
+        }
+    } catch (e) {
+        // Fallback for items not in TMDB or API failures
+        const fallbackCard = createFallbackCard(id, type);
+        container.appendChild(fallbackCard);
+    }
+}
+
+function createMovieCard(item, type) {
+    const card = document.createElement('div');
+    card.className = 'movie-card';
+    const title = item.title || item.name;
+    const imgUrl = item.backdrop_path ? `${TMDB_IMG}${item.backdrop_path}` : `${TMDB_IMG}${item.poster_path}`;
+    
+    card.innerHTML = `
+        <img src="${imgUrl}" alt="${title}" loading="lazy">
+        <div class="movie-info-overlay">
+            <div class="movie-title">${title}</div>
+            <div class="movie-meta">
+                <span>98% Match</span>
+                <span class="quality">4K</span>
+                <span>${new Date(item.release_date || item.first_air_date).getFullYear()}</span>
+            </div>
+        </div>
+    `;
+    card.onclick = () => openPlayer(item.id, type);
+    return card;
+}
+
+function createFallbackCard(id, type) {
+    const card = document.createElement('div');
+    card.className = 'movie-card';
+    card.innerHTML = `
+        <div style="padding: 20px; text-align: center;">${id}</div>
+        <div class="movie-info-overlay"><div class="movie-title">${type.toUpperCase()}</div></div>
+    `;
+    card.onclick = () => openPlayer(id, type);
+    return card;
+}
+
+// Search Logic
 async function handleSearch() {
     const query = searchInput.value.trim();
     if (!query) return;
@@ -55,24 +132,17 @@ async function handleSearch() {
         return;
     }
 
-    // Search by Name using TMDB
     try {
-        const response = await fetch(`${TMDB_BASE}/search/multi?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}`);
-        const data = await response.json();
-        
-        if (data.results && data.results.length > 0) {
+        const res = await fetch(`${TMDB_BASE}/search/multi?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        if (data.results) {
             displaySearchResults(data.results, query);
-        } else {
-            alert("No results found for: " + query);
         }
-    } catch (error) {
-        console.error("Search error:", error);
-        alert("Error searching for movie.");
-    }
+    } catch (e) { console.error(e); }
 }
 
 function displaySearchResults(results, query) {
-    document.getElementById('search-query-title').innerText = `Search Results for: ${query}`;
+    document.getElementById('search-query-title').innerText = `Results for: ${query}`;
     searchList.innerHTML = '';
     searchResults.style.display = 'block';
     heroSection.style.display = 'none';
@@ -80,24 +150,7 @@ function displaySearchResults(results, query) {
 
     results.forEach(item => {
         if (item.media_type !== 'movie' && item.media_type !== 'tv') return;
-        
-        const card = document.createElement('div');
-        card.className = 'movie-card';
-        card.style.minWidth = '180px';
-        card.style.margin = '10px';
-        
-        const posterUrl = item.poster_path ? `${TMDB_IMG}${item.poster_path}` : `https://picsum.photos/seed/${item.id}/200/115`;
-        const title = item.title || item.name;
-        
-        card.innerHTML = `
-            <img src="${posterUrl}" alt="${title}">
-            <div class="movie-info-overlay">
-                <p>${title}</p>
-                <p>${item.media_type.toUpperCase()}</p>
-            </div>
-        `;
-        
-        card.onclick = () => openPlayer(item.id, item.media_type);
+        const card = createMovieCard(item, item.media_type);
         searchList.appendChild(card);
     });
 }
@@ -109,71 +162,12 @@ function closeSearch() {
     searchInput.value = '';
 }
 
-async function fetchCategory(type, containerId, subType = 'new') {
-    const container = document.getElementById(containerId) || document.getElementById('new-releases');
-    container.innerHTML = '<p style="padding: 20px;">Loading...</p>';
-
-    try {
-        const response = await fetch(`${VIDSRC_API}/${type}/${subType}`);
-        const data = await response.json();
-
-        if (data && data.result) {
-            renderMovies(data.result, containerId, type);
-            if (containerId === 'new-releases' && data.result[0]) {
-                updateHero(data.result[0], type);
-            }
-        } else {
-            container.innerHTML = '<p style="padding: 20px;">No content found.</p>';
-        }
-    } catch (error) {
-        console.error("Error fetching data:", error);
-        container.innerHTML = '<p style="padding: 20px;">Error loading content.</p>';
-    }
-}
-
-function updateHero(item, type) {
-    const heroTitle = document.getElementById('heroTitle');
-    const heroDescription = document.getElementById('heroDescription');
-    const id = item.imdb_id || item.tmdb_id;
-    
-    heroTitle.innerText = `Featured ${type === 'movie' ? 'Movie' : 'Show'}: ${id}`;
-    heroDescription.innerText = `Stream the latest ${type} in ${item.quality || 'HD'} quality directly on NETF using VidSrc infrastructure.`;
-    
-    const playBtn = document.querySelector('.play-btn');
-    playBtn.onclick = () => openPlayer(id, type);
-}
-
-function renderMovies(movies, containerId, type) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = '';
-
-    movies.forEach(item => {
-        const id = item.imdb_id || item.tmdb_id;
-        if (!id) return;
-
-        const card = document.createElement('div');
-        card.className = 'movie-card';
-        
-        // Using a varied placeholder image
-        const posterUrl = `https://picsum.photos/seed/${id}/200/115`;
-        
-        card.innerHTML = `
-            <img src="${posterUrl}" alt="${id}">
-            <div class="movie-info-overlay">
-                <p>${type.toUpperCase()}: ${id}</p>
-                <p>Quality: ${item.quality || 'HD'}</p>
-            </div>
-        `;
-        
-        card.onclick = () => openPlayer(id, type);
-        container.appendChild(card);
-    });
-}
-
+// Player
 function openPlayer(id, type) {
     currentPlayerId = id;
     currentPlayerType = type;
     playerModal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
     
     if (type === 'tv') {
         tvControls.style.display = 'flex';
@@ -193,29 +187,21 @@ function updateTVPlayer() {
 function closePlayer() {
     playerModal.style.display = 'none';
     vidsrcIframe.src = "";
+    document.body.style.overflow = 'auto';
 }
 
-function handleSearch() {
-    const query = searchInput.value.trim();
-    if (!query) return;
+// Event Listeners
+window.addEventListener('scroll', () => {
+    if (window.scrollY > 50) navbar.classList.add('scrolled');
+    else navbar.classList.remove('scrolled');
+});
 
-    if (query.startsWith('tt') || !isNaN(query)) {
-        // Direct ID search
-        openPlayer(query, 'movie'); // Default to movie for search
-    } else {
-        alert("Please enter a valid IMDB ID (e.g., tt17048514) or TMDB ID.");
-    }
-}
+searchInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") handleSearch();
+});
 
-function showHome() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// Close modal when clicking outside
-window.onclick = function(event) {
-    if (event.target == playerModal) {
-        closePlayer();
-    }
+window.onclick = (e) => {
+    if (e.target == playerModal) closePlayer();
 }
 
 init();
