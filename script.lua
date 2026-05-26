@@ -12,9 +12,10 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
-local MainTab = Window:CreateTab("Movement", 4483362458) -- Title, Image
+local MainTab = Window:CreateTab("Movement", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals", 4483362458)
 local UtilityTab = Window:CreateTab("Utility", 4483362458)
+local ScriptsTab = Window:CreateTab("Scripts", 4483362458)
 
 -- Variables
 local flying = false
@@ -46,34 +47,70 @@ MainTab:CreateSlider({
    end,
 })
 
+-- FIXED FLY SCRIPT
 MainTab:CreateToggle({
    Name = "Flight",
    CurrentValue = false,
    Flag = "FlyToggle",
    Callback = function(Value)
       flying = Value
+      local player = game.Players.LocalPlayer
+      local char = player.Character or player.CharacterAdded:Wait()
+      local hrp = char:WaitForChild("HumanoidRootPart")
+      
       if flying then
-         -- Simple Fly Logic
-         local char = game.Players.LocalPlayer.Character
-         local hrp = char:WaitForChild("HumanoidRootPart")
-         local bv = Instance.new("BodyVelocity", hrp)
-         bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-         bv.Velocity = Vector3.new(0, 0, 0)
-         bv.Name = "FlyBV"
+         local bodyVel = Instance.new("BodyVelocity")
+         bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+         bodyVel.Velocity = Vector3.new(0, 0, 0)
+         bodyVel.Name = "FlyVelocity"
+         bodyVel.Parent = hrp
+         
+         local bodyGyro = Instance.new("BodyGyro")
+         bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+         bodyGyro.P = 9000
+         bodyGyro.D = 400
+         bodyGyro.CFrame = hrp.CFrame
+         bodyGyro.Name = "FlyGyro"
+         bodyGyro.Parent = hrp
+         
+         hum.PlatformStand = true
          
          task.spawn(function()
             while flying do
-               local cam = workspace.CurrentCamera
-               local dir = Vector3.new(0,0,0)
-               if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
-               if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
-               if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
-               if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
-               bv.Velocity = dir * flySpeed
+               local camera = workspace.CurrentCamera
+               local moveDir = Vector3.new(0, 0, 0)
+               
+               if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.W) then
+                  moveDir = moveDir + camera.CFrame.LookVector
+               end
+               if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.S) then
+                  moveDir = moveDir - camera.CFrame.LookVector
+               end
+               if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.A) then
+                  moveDir = moveDir - camera.CFrame.RightVector
+               end
+               if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.D) then
+                  moveDir = moveDir + camera.CFrame.RightVector
+               end
+               if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.Space) then
+                  moveDir = moveDir + Vector3.new(0, 1, 0)
+               end
+               if game:GetService("UserInputService"):IsKeyDown(Enum.KeyCode.LeftShift) then
+                  moveDir = moveDir - Vector3.new(0, 1, 0)
+               end
+               
+               bodyVel.Velocity = moveDir * flySpeed
+               bodyGyro.CFrame = camera.CFrame
                task.wait()
             end
-            bv:Destroy()
+            bodyVel:Destroy()
+            bodyGyro:Destroy()
+            hum.PlatformStand = false
          end)
+      else
+         if hrp:FindFirstChild("FlyVelocity") then hrp.FlyVelocity:Destroy() end
+         if hrp:FindFirstChild("FlyGyro") then hrp.FlyGyro:Destroy() end
+         hum.PlatformStand = false
       end
    end,
 })
@@ -123,16 +160,6 @@ VisualsTab:CreateSlider({
    end,
 })
 
-VisualsTab:CreateButton({
-   Name = "Full Bright",
-   Callback = function()
-      game:GetService("Lighting").Brightness = 2
-      game:GetService("Lighting").ClockTime = 14
-      game:GetService("Lighting").FogEnd = 100000
-      game:GetService("Lighting").GlobalShadows = false
-   end,
-})
-
 -- UTILITY
 UtilityTab:CreateButton({
    Name = "Anti-AFK",
@@ -146,37 +173,40 @@ UtilityTab:CreateButton({
    end,
 })
 
-UtilityTab:CreateButton({
-   Name = "Ctrl + Click TP",
+-- SCRIPTS TAB
+ScriptsTab:CreateButton({
+   Name = "Infinite Yield",
    Callback = function()
-      local UIS = game:GetService("UserInputService")
-      UIS.InputBegan:Connect(function(input)
-         if input.UserInputType == Enum.UserInputType.MouseButton1 and UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
-            game.Players.LocalPlayer.Character:MoveTo(game.Players.LocalPlayer:GetMouse().Hit.p)
-         end
-      end)
+      loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
    end,
 })
 
-UtilityTab:CreateToggle({
-   Name = "Auto-Clicker (E)",
-   CurrentValue = false,
-   Callback = function(Value)
-      _G.AutoClick = Value
-      task.spawn(function()
-         while _G.AutoClick do
-            keypress(0x45)
-            task.wait(0.1)
-            keyrelease(0x45)
-         end
-      end)
+ScriptsTab:CreateButton({
+   Name = "CMD-X",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/CMD-X/CMD-X/master/Source", true))()
    end,
 })
 
--- 20 Additional Features (Hidden list as requested)
--- 1. Noclip, 2. Speed Bypass, 3. God Mode (Local), 4. Chat Spammer, 5. FPS Unlocker,
--- 6. Server Hopper, 7. Rejoin, 8. Freecam, 9. Low Graphics Mode, 10. Hide UI,
--- 11. Custom Sky, 12. Instant Interaction, 13. Auto-Respawn, 14. Spin-bot, 15. Headless (Local),
--- 16. Korblox (Local), 17. Gravity Control, 18. Reach, 19. Hitbox Expander, 20. Remote Event Logger
+ScriptsTab:CreateButton({
+   Name = "Dark Dex V3",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/Babyhamsta/RBLX_Scripts/main/Universal/DarkDex.lua"))()
+   end,
+})
+
+ScriptsTab:CreateButton({
+   Name = "SimpleSpy",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/exxtremestuffs/SimpleSpy/master/SimpleSpySource.lua"))()
+   end,
+})
+
+ScriptsTab:CreateButton({
+   Name = "Remote Spy G2L",
+   Callback = function()
+      loadstring(game:HttpGet("https://raw.githubusercontent.com/78n/Hydroxide/main/init.lua"))()
+   end,
+})
 
 Rayfield:LoadConfiguration()
