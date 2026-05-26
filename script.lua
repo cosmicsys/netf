@@ -162,27 +162,73 @@ VisualsTab:CreateSlider({
 
 -- UTILITY
 local desyncEnabled = false
+local netlessEnabled = false
+
+-- FFlag Optimization (Universal)
+local function setFFlags(state)
+    local s = settings()
+    if state then
+        s.Physics.AllowSleep = false
+        s.Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalPhysicsThrottle.Disabled
+        -- Some executors support setfflag, we try-catch it
+        pcall(function()
+            setfflag("DFFlagDebugRenderCloudShadows", "False")
+            setfflag("FIntAntialiasingQuality", "0")
+            setfflag("FIntRenderShadowIntensity", "0")
+        end)
+    else
+        s.Physics.AllowSleep = true
+        s.Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalPhysicsThrottle.Default
+    end
+end
+
 UtilityTab:CreateToggle({
-   Name = "Desync",
+   Name = "Advanced Desync (FFlag)",
    CurrentValue = false,
    Flag = "DesyncToggle",
    Callback = function(Value)
       desyncEnabled = Value
+      setFFlags(Value)
+      
       if desyncEnabled then
          task.spawn(function()
+            local runService = game:GetService("RunService")
             while desyncEnabled do
                local char = game.Players.LocalPlayer.Character
                local hrp = char and char:FindFirstChild("HumanoidRootPart")
                if hrp then
-                  local oldVelocity = hrp.Velocity
-                  hrp.Velocity = Vector3.new(0, -500, 0) -- Vertical desync
-                  task.wait()
-                  hrp.Velocity = oldVelocity
+                  -- High-frequency Jitter Desync
+                  local oldVel = hrp.Velocity
+                  hrp.Velocity = Vector3.new(9e9, 9e9, 9e9) -- Breakthrough Velocity
+                  runService.RenderStepped:Wait()
+                  hrp.Velocity = oldVel
                end
-               task.wait(0.1)
+               task.wait(0.01)
             end
          end)
-         Rayfield:Notify({Title = "Desync Active", Content = "Your hitbox is now desynchronized from the server.", Duration = 3})
+         Rayfield:Notify({Title = "Advanced Desync", Content = "FFlags & Networking Optimized.", Duration = 3})
+      end
+   end,
+})
+
+UtilityTab:CreateToggle({
+   Name = "Netless Velocity",
+   CurrentValue = false,
+   Flag = "NetlessToggle",
+   Callback = function(Value)
+      netlessEnabled = Value
+      if netlessEnabled then
+         task.spawn(function()
+            while netlessEnabled do
+               local char = game.Players.LocalPlayer.Character
+               for _, part in pairs(char:GetChildren()) do
+                  if part:IsA("BasePart") then
+                     part.Velocity = Vector3.new(0, -30, 0)
+                  end
+               end
+               task.wait(0.03)
+            end
+         end)
       end
    end,
 })
