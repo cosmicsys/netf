@@ -163,18 +163,21 @@ VisualsTab:CreateSlider({
 -- UTILITY
 local desyncEnabled = false
 local netlessEnabled = false
+local desyncMode = "Jitter"
 
--- FFlag Optimization (Universal)
-local function setFFlags(state)
+-- FFlag Premium Networking Optimization
+local function setPremiumNetworking(state)
     local s = settings()
     if state then
         s.Physics.AllowSleep = false
         s.Physics.PhysicsEnvironmentalThrottle = Enum.EnviromentalPhysicsThrottle.Disabled
-        -- Some executors support setfflag, we try-catch it
+        s.Physics.ThrottleAdjustTime = 0
         pcall(function()
             setfflag("DFFlagDebugRenderCloudShadows", "False")
             setfflag("FIntAntialiasingQuality", "0")
             setfflag("FIntRenderShadowIntensity", "0")
+            setfflag("DFFlagVariableMaxSimulationTimeSteps", "True")
+            setfflag("FIntPhysicsSolverIterationLimit", "1")
         end)
     else
         s.Physics.AllowSleep = true
@@ -182,51 +185,77 @@ local function setFFlags(state)
     end
 end
 
+UtilityTab:CreateDropdown({
+   Name = "Desync Mode",
+   Options = {"Jitter", "Orbital", "Static"},
+   CurrentValue = "Jitter",
+   Flag = "DesyncMode",
+   Callback = function(Option)
+      desyncMode = Option
+   end,
+})
+
 UtilityTab:CreateToggle({
-   Name = "Advanced Desync (FFlag)",
+   Name = "Premium Desync",
    CurrentValue = false,
-   Flag = "DesyncToggle",
+   Flag = "PremiumDesyncToggle",
    Callback = function(Value)
       desyncEnabled = Value
-      setFFlags(Value)
+      setPremiumNetworking(Value)
       
       if desyncEnabled then
          task.spawn(function()
-            local runService = game:GetService("RunService")
+            local rs = game:GetService("RunService")
+            local lp = game.Players.LocalPlayer
+            local angle = 0
+            
             while desyncEnabled do
-               local char = game.Players.LocalPlayer.Character
+               local char = lp.Character
                local hrp = char and char:FindFirstChild("HumanoidRootPart")
                if hrp then
-                  -- High-frequency Jitter Desync
                   local oldVel = hrp.Velocity
-                  hrp.Velocity = Vector3.new(9e9, 9e9, 9e9) -- Breakthrough Velocity
-                  runService.RenderStepped:Wait()
+                  local oldCFrame = hrp.CFrame
+                  
+                  if desyncMode == "Jitter" then
+                     hrp.Velocity = Vector3.new(math.random(-1000000, 1000000), 0, math.random(-1000000, 1000000))
+                  elseif desyncMode == "Orbital" then
+                     angle = angle + 0.5
+                     hrp.Velocity = Vector3.new(math.sin(angle) * 1000000, 0, math.cos(angle) * 1000000)
+                  elseif desyncMode == "Static" then
+                     hrp.Velocity = Vector3.new(0, 9e9, 0)
+                  end
+                  
+                  rs.Heartbeat:Wait()
                   hrp.Velocity = oldVel
                end
-               task.wait(0.01)
+               rs.Heartbeat:Wait()
             end
          end)
-         Rayfield:Notify({Title = "Advanced Desync", Content = "FFlags & Networking Optimized.", Duration = 3})
+         Rayfield:Notify({Title = "Premium Active", Content = "Networking desynchronized via " .. desyncMode .. " mode.", Duration = 4})
       end
    end,
 })
 
 UtilityTab:CreateToggle({
-   Name = "Netless Velocity",
+   Name = "Netless (Physics Bypass)",
    CurrentValue = false,
    Flag = "NetlessToggle",
    Callback = function(Value)
       netlessEnabled = Value
       if netlessEnabled then
          task.spawn(function()
+            local rs = game:GetService("RunService")
             while netlessEnabled do
                local char = game.Players.LocalPlayer.Character
-               for _, part in pairs(char:GetChildren()) do
-                  if part:IsA("BasePart") then
-                     part.Velocity = Vector3.new(0, -30, 0)
+               if char then
+                  for _, v in pairs(char:GetChildren()) do
+                     if v:IsA("BasePart") then
+                        v.Velocity = Vector3.new(0, -31, 0)
+                        v.CanCollide = false
+                     end
                   end
                end
-               task.wait(0.03)
+               rs.Stepped:Wait()
             end
          end)
       end
