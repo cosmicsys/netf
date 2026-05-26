@@ -32,6 +32,16 @@
     </nav>
 
     <main>
+        <section id="search-results" style="display: none; padding: 100px 4% 20px 4%;">
+            <div class="row">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 id="search-query-title">Search Results</h2>
+                    <button onclick="closeSearch()" style="background: transparent; color: white; border: 1px solid white; padding: 5px 10px; cursor: pointer;">Close Search</button>
+                </div>
+                <div class="movie-list" id="search-list" style="flex-wrap: wrap;"></div>
+            </div>
+        </section>
+
         <section id="hero">
             <div class="hero-content">
                 <h1 id="heroTitle">Featured Movie</h1>
