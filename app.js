@@ -74,14 +74,13 @@ function renderMovies(movies, containerId, type) {
         const card = document.createElement('div');
         card.className = 'movie-card';
         
-        // Using a placeholder image since VidSrc API doesn't provide posters directly in the 'new' feed usually
-        // We'll try to use a placeholder or a common poster service if possible
-        const posterUrl = `https://images.unsplash.com/photo-1594908900066-3f47337549d8?q=80&w=2070&auto=format&fit=crop`;
+        // Using a varied placeholder image
+        const posterUrl = `https://picsum.photos/seed/${id}/200/115`;
         
         card.innerHTML = `
             <img src="${posterUrl}" alt="${id}">
             <div class="movie-info-overlay">
-                <p>ID: ${id}</p>
+                <p>${type.toUpperCase()}: ${id}</p>
                 <p>Quality: ${item.quality || 'HD'}</p>
             </div>
         `;
