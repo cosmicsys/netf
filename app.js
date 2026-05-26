@@ -39,6 +39,9 @@ async function fetchCategory(type, containerId, subType = 'new') {
 
         if (data && data.result) {
             renderMovies(data.result, containerId, type);
+            if (containerId === 'new-releases' && data.result[0]) {
+                updateHero(data.result[0], type);
+            }
         } else {
             container.innerHTML = '<p style="padding: 20px;">No content found.</p>';
         }
