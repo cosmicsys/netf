@@ -13,6 +13,8 @@
             --accent: #ffffff;
             --muted: #666666;
             --space-unit: 24px;
+            --radius-large: 24px;
+            --radius-medium: 12px;
         }
 
         * {
@@ -87,8 +89,8 @@
         .copy-section {
             background: var(--surface);
             border: 1px solid var(--border);
-            padding: calc(var(--space-unit) * 1.5);
-            border-radius: 4px;
+            padding: calc(var(--space-unit) * 2);
+            border-radius: var(--radius-large);
             margin-bottom: calc(var(--space-unit) * 2);
             transition: border-color 0.4s;
             position: relative;
@@ -105,6 +107,9 @@
             margin-bottom: calc(var(--space-unit) * 1.5);
             line-height: 1.6;
             word-break: break-all;
+            background: #050505;
+            padding: 15px;
+            border-radius: var(--radius-medium);
         }
 
         .button-row {
@@ -116,13 +121,13 @@
             background: transparent;
             border: 1px solid var(--border);
             color: var(--accent);
-            padding: 10px 24px;
+            padding: 12px 32px;
             font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            border-radius: 2px;
+            border-radius: 50px; /* Fully rounded button */
         }
 
         .copy-trigger:hover {
