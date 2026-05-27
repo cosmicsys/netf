@@ -13,14 +13,17 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- Tabs
-local CombatTab = Window:CreateTab("Combat", 4483362458)
+local CombatTab = Window:CreateTab("Elite Combat", 4483362458)
 local SurvivalTab = Window:CreateTab("Survival", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals", 4483362458)
 local UtilityTab = Window:CreateTab("Utility", 4483362458)
 
 -- Global States
 local States = {
-    Aimbot = false,
+    AimbotEnabled = false,
+    AimbotSmoothness = 1,
+    AimbotFOV = 150,
+    ShowFOV = false,
     LockPosition = Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y / 2),
     AimbotLocked = false,
     AntiDie = false,
@@ -37,7 +40,7 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Crosshair Drawing
+-- Drawing Objects
 local Crosshair = Drawing.new("Circle")
 Crosshair.Thickness = 2
 Crosshair.Color = Color3.fromRGB(255, 0, 0)
@@ -45,16 +48,30 @@ Crosshair.Radius = 5
 Crosshair.Filled = true
 Crosshair.Visible = false
 
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1
+FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 0.5
+FOVCircle.Visible = false
+
 -- [ UTILITY FUNCTIONS ] --
 local function GetClosestPlayer()
     local target = nil
-    local dist = math.huge
+    local dist = States.AimbotFOV
+    
+    -- Target relative to crosshair position
+    local center = States.LockPosition
+
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local d = (LocalPlayer.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
-            if d < dist then
-                target = p
-                dist = d
+            local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+            if onScreen then
+                local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                if d < dist then
+                    target = p
+                    dist = d
+                end
             end
         end
     end
@@ -75,20 +92,38 @@ end
 -- [ MAIN LOOP ] --
 RunService.RenderStepped:Connect(function()
     -- Crosshair Logic
-    Crosshair.Visible = States.Aimbot
-    if States.Aimbot and not States.AimbotLocked then
+    Crosshair.Visible = States.AimbotEnabled
+    if States.AimbotEnabled and not States.AimbotLocked then
         States.LockPosition = UserInputService:GetMouseLocation()
     end
     Crosshair.Position = States.LockPosition
+    
+    -- FOV Logic
+    FOVCircle.Visible = States.ShowFOV
+    FOVCircle.Radius = States.AimbotFOV
+    FOVCircle.Position = States.LockPosition
+
+    -- Aimbot Execution
+    if States.AimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPos = Camera:WorldToViewportPoint(target.Character.HumanoidRootPart.Position)
+            -- Aimbot relative to the chosen center (LockPosition)
+            mousemoverel(
+                (targetPos.X - States.LockPosition.X) / States.AimbotSmoothness, 
+                (targetPos.Y - States.LockPosition.Y) / States.AimbotSmoothness
+            )
+        end
+    end
 
     -- Anti-Die Logic
     if States.AntiDie and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         if LocalPlayer.Character.Humanoid.Health < 3000 then
-            local closest, dist = GetClosestPlayer()
-            if closest and dist < 100 then
+            local _, dist = GetClosestPlayer() -- Re-using check for closest player
+            if dist < 100 then
                 local escapePos = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(300, 50, 300)
                 LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(escapePos)
-                Rayfield:Notify({Title = "Anti-Die", Content = "Low Health! Teleported away from threat.", Duration = 3})
+                Rayfield:Notify({Title = "Anti-Die", Content = "Low Health! Escape triggered.", Duration = 3})
             end
         end
     end
@@ -117,20 +152,46 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- [ COMBAT TAB ] --
+-- [ ELITE COMBAT TAB ] --
+CombatTab:CreateSection("Targeting")
+
 CombatTab:CreateToggle({
-   Name = "Moveable Crosshair Aimbot",
+   Name = "Enable Aimbot & Crosshair",
    CurrentValue = false,
-   Callback = function(v) States.Aimbot = v end,
+   Callback = function(v) States.AimbotEnabled = v end,
 })
 
 CombatTab:CreateButton({
-   Name = "Lock/Unlock Crosshair Position",
+   Name = "Lock/Unlock Center Position",
    Callback = function() 
        States.AimbotLocked = not States.AimbotLocked
        Crosshair.Color = States.AimbotLocked and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-       Rayfield:Notify({Title = "Aimbot", Content = States.AimbotLocked and "Position Locked!" or "Position Unlocked (Follow Mouse)", Duration = 2})
+       Rayfield:Notify({Title = "Combat", Content = States.AimbotLocked and "Aimbot Center Locked!" or "Center following Mouse", Duration = 2})
    end,
+})
+
+CombatTab:CreateSection("Adjustments")
+
+CombatTab:CreateToggle({
+   Name = "Show FOV Radius",
+   CurrentValue = false,
+   Callback = function(v) States.ShowFOV = v end,
+})
+
+CombatTab:CreateSlider({
+   Name = "FOV Radius",
+   Range = {10, 800},
+   Increment = 10,
+   CurrentValue = 150,
+   Callback = function(v) States.AimbotFOV = v end,
+})
+
+CombatTab:CreateSlider({
+   Name = "Smoothness",
+   Range = {1, 10},
+   Increment = 0.1,
+   CurrentValue = 1,
+   Callback = function(v) States.AimbotSmoothness = v end,
 })
 
 -- [ SURVIVAL TAB ] --
@@ -175,14 +236,12 @@ VisualsTab:CreateToggle({
                            end
                            local label = char.HealthTag.TextLabel
                            label.Text = p.Name .. " | " .. math.floor(hum.Health) .. " HP"
-                           -- Color blending based on health
                            local percent = hum.Health / hum.MaxHealth
-                           label.TextColor3 = Color3.fromHSV(percent * 0.3, 1, 1) -- Red (0) to Green (0.3)
+                           label.TextColor3 = Color3.fromHSV(percent * 0.3, 1, 1)
                        end
                    end
                    task.wait(0.5)
                end
-               -- Cleanup
                for _, p in pairs(Players:GetPlayers()) do
                    if p.Character and p.Character:FindFirstChild("HealthTag") then p.Character.HealthTag:Destroy() end
                end
