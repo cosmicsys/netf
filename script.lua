@@ -22,10 +22,10 @@ local ScriptsTab = Window:CreateTab("Scripts", 4483362458)
 local States = {
     Flying = false,
     FlySpeed = 50,
-    Desync = false,
-    DesyncMode = "Jitter",
-    Visualizer = false,
-    Netless = false
+    SpeedBypass = false,
+    BypassSpeed = 50,
+    Netless = false,
+    Lagger = false
 }
 
 -- References
@@ -59,6 +59,32 @@ MainTab:CreateSlider({
    Increment = 1,
    CurrentValue = 50,
    Callback = function(v) Humanoid.JumpPower = v end,
+})
+
+MainTab:CreateToggle({
+   Name = "Speed Bypass (CFrame)",
+   CurrentValue = false,
+   Callback = function(state)
+      States.SpeedBypass = state
+      if state then
+         task.spawn(function()
+            while States.SpeedBypass do
+               if Humanoid.MoveDirection.Magnitude > 0 then
+                  RootPart.CFrame = RootPart.CFrame + (Humanoid.MoveDirection * (States.BypassSpeed / 100))
+               end
+               RunService.Heartbeat:Wait()
+            end
+         end)
+      end
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "Bypass Speed",
+   Range = {10, 200},
+   Increment = 5,
+   CurrentValue = 50,
+   Callback = function(v) States.BypassSpeed = v end,
 })
 
 MainTab:CreateToggle({
@@ -102,82 +128,47 @@ MainTab:CreateToggle({
    end,
 })
 
-MainTab:CreateSlider({
-   Name = "Fly Speed",
-   Range = {10, 500},
-   Increment = 5,
-   CurrentValue = 50,
-   Callback = function(v) States.FlySpeed = v end,
-})
-
--- [ UTILITY & DESYNC ] --
-local fakeChar = nil
-local function ClearVisualizer()
-    if fakeChar then fakeChar:Destroy() fakeChar = nil end
-end
-
-UtilityTab:CreateDropdown({
-   Name = "Desync Mode",
-   Options = {"Jitter", "Orbit", "Lagger"},
-   CurrentValue = "Jitter",
-   Callback = function(v) States.DesyncMode = v end,
-})
-
-UtilityTab:CreateToggle({
-   Name = "Elite Desync",
-   CurrentValue = false,
-   Callback = function(state)
-      States.Desync = state
-      if state then
-         task.spawn(function()
-            local angle = 0
-            while States.Desync do
-               local oldVel = RootPart.Velocity
-               if States.DesyncMode == "Jitter" then
-                  RootPart.Velocity = Vector3.new(math.random(-1e6, 1e6), 0, math.random(-1e6, 1e6))
-               elseif States.DesyncMode == "Orbit" then
-                  angle = angle + 0.1
-                  RootPart.Velocity = Vector3.new(math.sin(angle) * 1e6, 0, math.cos(angle) * 1e6)
-               elseif States.DesyncMode == "Lagger" then
-                  RootPart.Velocity = Vector3.new(0, -1e7, 0)
+-- [ UTILITY ] --
+UtilityTab:CreateButton({
+   Name = "Remote Deobfuscator",
+   Callback = function()
+      local count = 0
+      for _, v in pairs(game:GetDescendants()) do
+         if v:IsA("RemoteEvent") or v:IsA("RemoteFunction") then
+            if v.Name:find("/") then
+               local newName = ""
+               for code in v.Name:gmatch("(%d+)") do
+                  newName = newName .. string.char(tonumber(code))
                end
-               RunService.Heartbeat:Wait()
-               RootPart.Velocity = oldVel
-               RunService.Heartbeat:Wait()
+               if newName ~= "" then
+                  v.Name = newName
+                  count = count + 1
+               end
             end
-         end)
-         Rayfield:Notify({Title = "Elite Desync", Content = "Hitbox manipulation active.", Duration = 3})
+         end
       end
+      Rayfield:Notify({Title = "Deobfuscator", Content = "Successfully cleaned " .. count .. " obfuscated remotes.", Duration = 5})
    end,
 })
 
 UtilityTab:CreateToggle({
-   Name = "Desync Visualizer",
+   Name = "Client Lagger",
    CurrentValue = false,
    Callback = function(state)
-      States.Visualizer = state
+      States.Lagger = state
       if state then
-         RunService.Heartbeat:Connect(function()
-            if not States.Visualizer then ClearVisualizer() return end
-            if not fakeChar then
-                Character.Archivable = true
-                fakeChar = Character:Clone()
-                fakeChar.Parent = workspace
-                for _, v in pairs(fakeChar:GetChildren()) do
-                    if v:IsA("BasePart") then
-                        v.Transparency = 0.6
-                        v.CanCollide = false
-                        v.Material = Enum.Material.ForceField
-                        v.Color = Color3.fromRGB(0, 255, 255)
-                    elseif v:IsA("LocalScript") or v:IsA("Script") then
-                        v:Destroy()
-                    end
-                end
+         task.spawn(function()
+            while States.Lagger do
+               for i = 1, 1000 do
+                  local p = Instance.new("Part")
+                  p.Transparency = 1
+                  p.CanCollide = false
+                  p.Anchored = true
+                  p:Destroy()
+               end
+               RunService.Heartbeat:Wait()
             end
-            fakeChar:SetPrimaryPartCFrame(RootPart.CFrame)
          end)
-      else
-         ClearVisualizer()
       end
    end,
 })
@@ -199,6 +190,17 @@ UtilityTab:CreateToggle({
             end
          end)
       end
+   end,
+})
+
+UtilityTab:CreateButton({
+   Name = "Anti-AFK",
+   Callback = function()
+      local virtualUser = game:GetService("VirtualUser")
+      LocalPlayer.Idled:Connect(function()
+         virtualUser:CaptureController()
+         virtualUser:ClickButton2(Vector2.new())
+      end)
    end,
 })
 
