@@ -190,6 +190,39 @@ AimbotTab:CreateSlider({
 })
 
 -- [ EVERYTHING ELSE TAB ] --
+EverythingElseTab:CreateSection("Performance & Optimization")
+
+EverythingElseTab:CreateButton({
+   Name = "Anti-Lag (FPS Booster)",
+   Callback = function()
+       local lighting = game:GetService("Lighting")
+       lighting.GlobalShadows = false
+       lighting.FogEnd = 9e9
+       settings().Rendering.QualityLevel = 1
+       for _, v in pairs(game:GetDescendants()) do
+           if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
+               v.Material = Enum.Material.SmoothPlastic
+               v.Reflectance = 0
+           elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+               v.Enabled = false
+           end
+       end
+       Rayfield:Notify({Title = "Performance", Content = "Engine optimized for max FPS.", Duration = 3})
+   end,
+})
+
+EverythingElseTab:CreateButton({
+   Name = "Anti-AFK",
+   Callback = function()
+      local virtualUser = game:GetService("VirtualUser")
+      LocalPlayer.Idled:Connect(function()
+         virtualUser:CaptureController()
+         virtualUser:ClickButton2(Vector2.new())
+      end)
+      Rayfield:Notify({Title = "Active", Content = "Anti-AFK enabled.", Duration = 3})
+   end,
+})
+
 EverythingElseTab:CreateSection("Survival")
 
 EverythingElseTab:CreateToggle({
@@ -248,22 +281,11 @@ EverythingElseTab:CreateToggle({
    end,
 })
 
-EverythingElseTab:CreateSection("Utility")
+EverythingElseTab:CreateSection("External Scripts")
 
 EverythingElseTab:CreateButton({
    Name = "Infinite Yield",
    Callback = function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end,
-})
-
-EverythingElseTab:CreateButton({
-   Name = "Anti-AFK",
-   Callback = function()
-      local virtualUser = game:GetService("VirtualUser")
-      LocalPlayer.Idled:Connect(function()
-         virtualUser:CaptureController()
-         virtualUser:ClickButton2(Vector2.new())
-      end)
-   end,
 })
 
 Rayfield:LoadConfiguration()
