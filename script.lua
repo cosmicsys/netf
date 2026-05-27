@@ -1,297 +1,150 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
-local Window = Rayfield:CreateWindow({
-   Name = "Universal Hub | God Edition",
-   LoadingTitle = "Initializing God Framework...",
-   LoadingSubtitle = "by Gemini CLI",
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = "EliteHub",
-      FileName = "GodMode"
-   },
-   KeySystem = false
-})
-
--- Two Tabs
-local AimlockTab = Window:CreateTab("Aimlock", 4483362458)
-local EverythingElseTab = Window:CreateTab("Everything Else", 4483362458)
-
--- Global States
-local States = {
-    AimlockEnabled = false,
-    AimlockSmoothness = 0.1,
-    AimlockFOV = 150,
-    ShowFOV = false,
-    LockPosition = Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y / 2),
-    CenterLocked = false,
-    AntiDie = false,
-    HealthESP = false,
-    TweenSpeed = 300,
-    LastNotification = 0
-}
-
--- Target Variable for Sticky Lock
-local CurrentTarget = nil
-
--- References
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+--// Speed car modify | Cosmic Edition
+local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local Players = game:GetService("Players")
 
--- Drawing Objects
-local Crosshair = Drawing.new("Circle")
-Crosshair.Thickness = 2
-Crosshair.Color = Color3.fromRGB(255, 0, 0)
-Crosshair.Radius = 5
-Crosshair.Filled = true
-Crosshair.Visible = false
-
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1
-FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-FOVCircle.Filled = false
-FOVCircle.Transparency = 0.5
-FOVCircle.Visible = false
-
--- [ IMPROVED TARGET SELECTION ] --
-local function GetNearestPlayer()
-    local target = nil
-    local shortestDist = math.huge
-    local center = States.LockPosition
-
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-            local headPos = p.Character.Head.Position
-            local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
-            
-            if onScreen then
-                -- Check if inside FOV first
-                local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                if fovDist <= States.AimlockFOV then
-                    -- Select by physical 3D distance for "Nearest" feel
-                    local physicalDist = (LocalPlayer.Character.HumanoidRootPart.Position - headPos).Magnitude
-                    if physicalDist < shortestDist then
-                        target = p
-                        shortestDist = physicalDist
-                    end
-                end
-            end
-        end
-    end
-    return target
+--// CLEANUP PREVIOUS
+if CoreGui:FindFirstChild("CosmicSpeedGUI") then
+    CoreGui.CosmicSpeedGUI:Destroy()
 end
 
-local function TweenTo(targetPos)
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local dist = (char.HumanoidRootPart.Position - targetPos).Magnitude
-    local duration = dist / States.TweenSpeed
+--// GUI SETUP
+local gui = Instance.new("ScreenGui")
+gui.Name = "CosmicSpeedGUI"
+gui.Parent = CoreGui
+gui.ResetOnSpawn = false
+
+--// MAIN FRAME
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 110)
+frame.Position = UDim2.new(0.5, -100, 0.5, -55)
+frame.BackgroundColor3 = Color3.fromRGB(15, 5, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Parent = gui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+
+--// TITLE
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 25)
+title.BackgroundTransparency = 1
+title.Text = "COSMIC SPEED"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 12
+title.TextColor3 = Color3.fromRGB(200, 150, 255)
+title.Parent = frame
+
+--// THE TOGGLE BUTTON
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0.8, 0, 0, 30)
+button.Position = UDim2.new(0.1, 0, 0.3, 0)
+button.BackgroundColor3 = Color3.fromRGB(25, 10, 45)
+button.Text = "OFF"
+button.Font = Enum.Font.GothamBold
+button.TextSize = 16
+button.TextColor3 = Color3.fromRGB(200, 150, 255)
+button.ZIndex = 10
+button.Parent = frame
+Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
+
+--// SPEED INPUT
+local speedInput = Instance.new("TextBox")
+speedInput.Size = UDim2.new(0.8, 0, 0, 25)
+speedInput.Position = UDim2.new(0.1, 0, 0.65, 0)
+speedInput.BackgroundColor3 = Color3.fromRGB(10, 5, 20)
+speedInput.Text = "200"
+speedInput.PlaceholderText = "Multiplier"
+speedInput.Font = Enum.Font.Gotham
+speedInput.TextSize = 14
+speedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedInput.Parent = frame
+Instance.new("UICorner", speedInput).CornerRadius = UDim.new(0, 6)
+
+--// ⭐ COSMIC STARS
+for i = 1, 15 do
+    local star = Instance.new("Frame")
+    local size = math.random(1, 3)
+    star.Size = UDim2.new(0, size, 0, size)
+    star.Position = UDim2.new(0, math.random(5, 195), 0, math.random(5, 105))
+    star.BackgroundColor3 = Color3.fromRGB(200, 150, 255)
+    star.BorderSizePixel = 0
+    star.BackgroundTransparency = 0.4
+    star.ZIndex = 5
+    star.Parent = frame
+    Instance.new("UICorner", star).CornerRadius = UDim.new(1, 0)
     
-    local tween = TweenService:Create(char.HumanoidRootPart, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetPos)})
-    tween:Play()
-    return tween
+    local baseX, baseY = star.Position.X.Offset, star.Position.Y.Offset
+    local radius, speed, t = math.random(3, 8), 0.3 + math.random(), math.random() * 10
+    RunService.RenderStepped:Connect(function()
+        if not star.Parent then return end
+        t += speed * 0.02
+        star.Position = UDim2.new(0, math.clamp(baseX + math.cos(t) * radius, 5, 195), 0, math.clamp(baseY + math.sin(t * 0.8) * radius, 5, 105))
+    end)
 end
 
--- [ MAIN LOOP ] --
-RunService.RenderStepped:Connect(function()
-    -- Crosshair & Center Logic
-    Crosshair.Visible = States.AimlockEnabled
-    if States.AimlockEnabled and not States.CenterLocked then
-        States.LockPosition = UserInputService:GetMouseLocation()
-    end
-    Crosshair.Position = States.LockPosition
-    
-    -- FOV Logic
-    FOVCircle.Visible = States.ShowFOV
-    FOVCircle.Radius = States.AimlockFOV
-    FOVCircle.Position = States.LockPosition
+--// TOGGLE LOGIC
+local toggled = false
+local currentSpeed = 200
 
-    -- Elite Aimlock Execution
-    if States.AimlockEnabled then
-        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-            -- Acquire target if we don't have one
-            if not CurrentTarget or not CurrentTarget.Character or not CurrentTarget.Character:FindFirstChild("Head") or CurrentTarget.Character.Humanoid.Health <= 0 then
-                CurrentTarget = GetNearestPlayer()
-            end
-            
-            -- Lock onto target
-            if CurrentTarget and CurrentTarget.Character and CurrentTarget.Character:FindFirstChild("Head") then
-                local targetPos = CurrentTarget.Character.Head.Position
-                Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 1 - States.AimlockSmoothness)
-            end
-        else
-            -- Reset target on key release (Stop sticking)
-            CurrentTarget = nil
-        end
+local function onToggle()
+    toggled = not toggled
+    if toggled then
+        button.Text = "ON"
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        TweenService:Create(frame, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(60, 30, 100)}):Play()
+    else
+        button.Text = "OFF"
+        button.TextColor3 = Color3.fromRGB(200, 150, 255)
+        TweenService:Create(frame, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(15, 5, 30)}):Play()
     end
+end
 
-    -- Anti-Die Logic
-    if States.AntiDie and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        if LocalPlayer.Character.Humanoid.Health < 3000 then
-            local closest = GetNearestPlayer()
-            if closest then
-                local escapePos = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(math.random(200, 400), 100, math.random(200, 400))
-                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(escapePos)
-                Rayfield:Notify({Title = "Anti-Die", Content = "Health Critical! Auto-Escape active.", Duration = 3})
-            end
-        end
+button.MouseButton1Click:Connect(onToggle)
+
+speedInput.FocusLost:Connect(function()
+    local val = tonumber(speedInput.Text)
+    if val then
+        currentSpeed = val
+    else
+        speedInput.Text = tostring(currentSpeed)
     end
+end)
 
-    -- Intelligent Kill Notifications
-    if tick() - States.LastNotification > 10 then
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") then
-                local health = p.Character.Humanoid.Health
-                local dist = (LocalPlayer.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
-                if health < 5000 and dist < 1000 then
-                    States.LastNotification = tick()
-                    Rayfield:Notify({
-                        Title = "Finish Him!",
-                        Content = p.Name .. " is low! (" .. math.floor(health) .. " HP). Distance: " .. math.floor(dist),
-                        Duration = 8,
-                        Actions = {
-                            Ignore = {Name = "Ignore", Callback = function() end},
-                            Tween = {Name = "Tween", Callback = function() TweenTo(p.Character.HumanoidRootPart.Position) end}
-                        }
-                    })
-                    break
+--// 🚀 SPEED LOGIC
+RunService.Heartbeat:Connect(function()
+    if toggled then
+        local char = Players.LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            local seat = char.Humanoid.SeatPart
+            if seat and seat:IsA("VehicleSeat") then
+                if seat.Throttle ~= 0 then
+                    seat.AssemblyLinearVelocity = seat.AssemblyLinearVelocity + (seat.CFrame.LookVector * (currentSpeed / 10))
                 end
             end
         end
     end
 end)
 
--- [ AIMLOCK TAB ] --
-AimlockTab:CreateSection("Core Mechanics")
+--// 🚀 DRAG SYSTEM
+local dragging, dragStart, startPos
+button.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
 
-AimlockTab:CreateToggle({
-   Name = "Enable Elite Aimlock",
-   CurrentValue = false,
-   Callback = function(v) States.AimlockEnabled = v end,
-})
-
-AimlockTab:CreateButton({
-   Name = "Lock Aim Center (Crosshair)",
-   Callback = function() 
-       States.CenterLocked = not States.CenterLocked
-       Crosshair.Color = States.CenterLocked and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-       Rayfield:Notify({Title = "Aimlock", Content = States.CenterLocked and "Center Locked!" or "Center following Mouse", Duration = 2})
-   end,
-})
-
-AimlockTab:CreateSection("Settings")
-
-AimlockTab:CreateToggle({
-   Name = "Show FOV Circle",
-   CurrentValue = false,
-   Callback = function(v) States.ShowFOV = v end,
-})
-
-AimlockTab:CreateSlider({
-   Name = "Target FOV",
-   Range = {10, 800},
-   Increment = 10,
-   CurrentValue = 150,
-   Callback = function(v) States.AimlockFOV = v end,
-})
-
-AimlockTab:CreateSlider({
-   Name = "Smoothness",
-   Range = {0, 0.9},
-   Increment = 0.01,
-   CurrentValue = 0.1,
-   Callback = function(v) States.AimlockSmoothness = v end,
-})
-
--- [ EVERYTHING ELSE TAB ] --
-EverythingElseTab:CreateSection("Performance")
-
-EverythingElseTab:CreateButton({
-   Name = "Anti-Lag (FPS Booster)",
-   Callback = function()
-       local lighting = game:GetService("Lighting")
-       lighting.GlobalShadows = false
-       lighting.FogEnd = 9e9
-       settings().Rendering.QualityLevel = 1
-       for _, v in pairs(game:GetDescendants()) do
-           if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
-               v.Material = Enum.Material.SmoothPlastic
-               v.Reflectance = 0
-           elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-               v.Enabled = false
-           end
-       end
-       Rayfield:Notify({Title = "Performance", Content = "Optimization applied.", Duration = 3})
-   end,
-})
-
-EverythingElseTab:CreateSection("Survival & Visuals")
-
-EverythingElseTab:CreateToggle({
-   Name = "Anti-Die (Auto-TP)",
-   CurrentValue = false,
-   Callback = function(v) States.AntiDie = v end,
-})
-
-EverythingElseTab:CreateToggle({
-   Name = "Dynamic Health ESP",
-   CurrentValue = false,
-   Callback = function(v)
-       States.HealthESP = v
-       if v then
-           task.spawn(function()
-               while States.HealthESP do
-                   for _, p in pairs(Players:GetPlayers()) do
-                       if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") then
-                           local char = p.Character
-                           local hum = char.Humanoid
-                           if not char:FindFirstChild("HealthTag") then
-                               local bill = Instance.new("BillboardGui", char)
-                               bill.Name = "HealthTag"
-                               bill.Size = UDim2.new(0, 100, 0, 50)
-                               bill.Adornee = char:FindFirstChild("Head")
-                               bill.AlwaysOnTop = true
-                               local txt = Instance.new("TextLabel", bill)
-                               txt.Size = UDim2.new(1, 0, 1, 0)
-                               txt.BackgroundTransparency = 1
-                               txt.Font = Enum.Font.GothamBold
-                               txt.TextSize = 14
-                           end
-                           local label = char.HealthTag.TextLabel
-                           label.Text = p.Name .. " | " .. math.floor(hum.Health) .. " HP"
-                           local percent = hum.Health / hum.MaxHealth
-                           label.TextColor3 = Color3.fromHSV(percent * 0.3, 1, 1)
-                       end
-                   end
-                   task.wait(0.5)
-               end
-               for _, p in pairs(Players:GetPlayers()) do
-                   if p.Character and p.Character:FindFirstChild("HealthTag") then p.Character.HealthTag:Destroy() end
-               end
-           end)
-       end
-   end,
-})
-
-EverythingElseTab:CreateSection("Utility")
-
-EverythingElseTab:CreateButton({
-   Name = "Infinite Yield",
-   Callback = function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end,
-})
-
-EverythingElseTab:CreateButton({
-   Name = "Anti-AFK",
-   Callback = function()
-      local virtualUser = game:GetService("VirtualUser")
-      LocalPlayer.Idled:Connect(function()
-         virtualUser:CaptureController()
-         virtualUser:ClickButton2(Vector2.new())
-      end)
-   end,
-})
-
-Rayfield:LoadConfiguration()
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
