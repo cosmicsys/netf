@@ -1,179 +1,194 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Universal Hub | Combat Edition",
-   LoadingTitle = "Loading Combat Framework...",
+   Name = "Universal Hub | God Edition",
+   LoadingTitle = "Initializing God Framework...",
    LoadingSubtitle = "by Gemini CLI",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "EliteHub",
-      FileName = "Main"
+      FileName = "GodMode"
    },
    KeySystem = false
 })
 
 -- Tabs
-local AimbotTab = Window:CreateTab("Aimbot", 4483362458)
-local MainTab = Window:CreateTab("Movement", 4483362458)
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local SurvivalTab = Window:CreateTab("Survival", 4483362458)
 local VisualsTab = Window:CreateTab("Visuals", 4483362458)
 local UtilityTab = Window:CreateTab("Utility", 4483362458)
-local ScriptsTab = Window:CreateTab("Scripts", 4483362458)
 
 -- Global States
 local States = {
-    AimbotEnabled = false,
-    AimbotTeamCheck = false,
-    AimbotFOV = 150,
-    AimbotSmoothness = 1,
-    ShowFOV = false,
-    Flying = false,
-    FlySpeed = 50,
+    Aimbot = false,
+    LockPosition = Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y / 2),
+    AimbotLocked = false,
+    AntiDie = false,
+    HealthESP = false,
+    TweenSpeed = 300,
+    LastNotification = 0
 }
 
 -- References
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- FOV Circle
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1
-FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-FOVCircle.Filled = false
-FOVCircle.Transparency = 0.5
+-- Crosshair Drawing
+local Crosshair = Drawing.new("Circle")
+Crosshair.Thickness = 2
+Crosshair.Color = Color3.fromRGB(255, 0, 0)
+Crosshair.Radius = 5
+Crosshair.Filled = true
+Crosshair.Visible = false
 
--- [ AIMBOT LOGIC ] --
+-- [ UTILITY FUNCTIONS ] --
 local function GetClosestPlayer()
-    local closestPlayer = nil
-    local shortestDistance = States.AimbotFOV
+    local target = nil
+    local dist = math.huge
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local d = (LocalPlayer.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+            if d < dist then
+                target = p
+                dist = d
+            end
+        end
+    end
+    return target, dist
+end
 
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            if States.AimbotTeamCheck and player.Team == LocalPlayer.Team then continue end
-            
-            local pos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-            if onScreen then
-                local distance = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
-                if distance < shortestDistance then
-                    closestPlayer = player
-                    shortestDistance = distance
+local function TweenTo(targetPos)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local dist = (char.HumanoidRootPart.Position - targetPos).Magnitude
+    local duration = dist / States.TweenSpeed
+    
+    local tween = TweenService:Create(char.HumanoidRootPart, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetPos)})
+    tween:Play()
+    return tween
+end
+
+-- [ MAIN LOOP ] --
+RunService.RenderStepped:Connect(function()
+    -- Crosshair Logic
+    Crosshair.Visible = States.Aimbot
+    if States.Aimbot and not States.AimbotLocked then
+        States.LockPosition = UserInputService:GetMouseLocation()
+    end
+    Crosshair.Position = States.LockPosition
+
+    -- Anti-Die Logic
+    if States.AntiDie and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        if LocalPlayer.Character.Humanoid.Health < 3000 then
+            local closest, dist = GetClosestPlayer()
+            if closest and dist < 100 then
+                local escapePos = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(300, 50, 300)
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(escapePos)
+                Rayfield:Notify({Title = "Anti-Die", Content = "Low Health! Teleported away from threat.", Duration = 3})
+            end
+        end
+    end
+
+    -- Intelligent Notifications
+    if tick() - States.LastNotification > 10 then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") then
+                local health = p.Character.Humanoid.Health
+                local dist = (LocalPlayer.Character.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                if health < 5000 and dist < 1000 then
+                    States.LastNotification = tick()
+                    Rayfield:Notify({
+                        Title = "Kill Opportunity",
+                        Content = p.Name .. " is low! (" .. math.floor(health) .. " HP). Distance: " .. math.floor(dist),
+                        Duration = 8,
+                        Actions = {
+                            Ignore = {Name = "Ignore", Callback = function() end},
+                            Tween = {Name = "Tween", Callback = function() TweenTo(p.Character.HumanoidRootPart.Position) end}
+                        }
+                    })
+                    break
                 end
             end
         end
     end
-    return closestPlayer
-end
-
-RunService.RenderStepped:Connect(function()
-    FOVCircle.Visible = States.ShowFOV
-    FOVCircle.Radius = States.AimbotFOV
-    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    if States.AimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        local target = GetClosestPlayer()
-        if target and target.Character then
-            local targetPos = Camera:WorldToViewportPoint(target.Character.HumanoidRootPart.Position)
-            mousemoverel((targetPos.X - Camera.ViewportSize.X / 2) / States.AimbotSmoothness, (targetPos.Y - Camera.ViewportSize.Y / 2) / States.AimbotSmoothness)
-        end
-    end
 end)
 
--- [ AIMBOT TAB ] --
-AimbotTab:CreateToggle({
-   Name = "Enabled",
+-- [ COMBAT TAB ] --
+CombatTab:CreateToggle({
+   Name = "Moveable Crosshair Aimbot",
    CurrentValue = false,
-   Callback = function(v) States.AimbotEnabled = v end,
+   Callback = function(v) States.Aimbot = v end,
 })
 
-AimbotTab:CreateToggle({
-   Name = "Team Check",
-   CurrentValue = false,
-   Callback = function(v) States.AimbotTeamCheck = v end,
-})
-
-AimbotTab:CreateToggle({
-   Name = "Show FOV",
-   CurrentValue = false,
-   Callback = function(v) States.ShowFOV = v end,
-})
-
-AimbotTab:CreateSlider({
-   Name = "FOV Radius",
-   Range = {10, 800},
-   Increment = 10,
-   CurrentValue = 150,
-   Callback = function(v) States.AimbotFOV = v end,
-})
-
-AimbotTab:CreateSlider({
-   Name = "Smoothness",
-   Range = {1, 10},
-   Increment = 0.1,
-   CurrentValue = 1,
-   Callback = function(v) States.AimbotSmoothness = v end,
-})
-
--- [ MOVEMENT ] --
-MainTab:CreateSlider({
-   Name = "WalkSpeed",
-   Range = {16, 500},
-   Increment = 1,
-   CurrentValue = 16,
-   Callback = function(v) 
-       local char = LocalPlayer.Character
-       if char and char:FindFirstChild("Humanoid") then char.Humanoid.WalkSpeed = v end
+CombatTab:CreateButton({
+   Name = "Lock/Unlock Crosshair Position",
+   Callback = function() 
+       States.AimbotLocked = not States.AimbotLocked
+       Crosshair.Color = States.AimbotLocked and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+       Rayfield:Notify({Title = "Aimbot", Content = States.AimbotLocked and "Position Locked!" or "Position Unlocked (Follow Mouse)", Duration = 2})
    end,
 })
 
--- [ UTILITY ] --
-UtilityTab:CreateButton({
-   Name = "Anti-Lag (FPS Booster)",
-   Callback = function()
-       local lighting = game:GetService("Lighting")
-       lighting.GlobalShadows = false
-       lighting.FogEnd = 9e9
-       settings().Rendering.QualityLevel = 1
-       for _, v in pairs(game:GetDescendants()) do
-           if v:IsA("Part") or v:IsA("UnionOperation") or v:IsA("MeshPart") then
-               v.Material = Enum.Material.SmoothPlastic
-               v.Reflectance = 0
-           elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-               v.Enabled = false
-           end
+-- [ SURVIVAL TAB ] --
+SurvivalTab:CreateToggle({
+   Name = "Anti-Die (3000 HP Trigger)",
+   CurrentValue = false,
+   Callback = function(v) States.AntiDie = v end,
+})
+
+SurvivalTab:CreateSlider({
+   Name = "Tween Speed",
+   Range = {100, 1000},
+   Increment = 50,
+   CurrentValue = 300,
+   Callback = function(v) States.TweenSpeed = v end,
+})
+
+-- [ VISUALS TAB ] --
+VisualsTab:CreateToggle({
+   Name = "Dynamic Health ESP",
+   CurrentValue = false,
+   Callback = function(v)
+       States.HealthESP = v
+       if v then
+           task.spawn(function()
+               while States.HealthESP do
+                   for _, p in pairs(Players:GetPlayers()) do
+                       if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") then
+                           local char = p.Character
+                           local hum = char.Humanoid
+                           if not char:FindFirstChild("HealthTag") then
+                               local bill = Instance.new("BillboardGui", char)
+                               bill.Name = "HealthTag"
+                               bill.Size = UDim2.new(0, 100, 0, 50)
+                               bill.Adornee = char:FindFirstChild("Head")
+                               bill.AlwaysOnTop = true
+                               local txt = Instance.new("TextLabel", bill)
+                               txt.Size = UDim2.new(1, 0, 1, 0)
+                               txt.BackgroundTransparency = 1
+                               txt.Font = Enum.Font.GothamBold
+                               txt.TextSize = 14
+                           end
+                           local label = char.HealthTag.TextLabel
+                           label.Text = p.Name .. " | " .. math.floor(hum.Health) .. " HP"
+                           -- Color blending based on health
+                           local percent = hum.Health / hum.MaxHealth
+                           label.TextColor3 = Color3.fromHSV(percent * 0.3, 1, 1) -- Red (0) to Green (0.3)
+                       end
+                   end
+                   task.wait(0.5)
+               end
+               -- Cleanup
+               for _, p in pairs(Players:GetPlayers()) do
+                   if p.Character and p.Character:FindFirstChild("HealthTag") then p.Character.HealthTag:Destroy() end
+               end
+           end)
        end
-       Rayfield:Notify({Title = "Performance", Content = "Optimized rendering for max FPS.", Duration = 3})
    end,
 })
-
-UtilityTab:CreateButton({
-   Name = "Anti-AFK",
-   Callback = function()
-      local virtualUser = game:GetService("VirtualUser")
-      LocalPlayer.Idled:Connect(function()
-         virtualUser:CaptureController()
-         virtualUser:ClickButton2(Vector2.new())
-      end)
-   end,
-})
-
--- [ VISUALS ] --
-VisualsTab:CreateButton({
-   Name = "ESP Highlights",
-   Callback = function()
-      for _, p in pairs(Players:GetPlayers()) do
-         if p ~= LocalPlayer and p.Character then
-            local h = Instance.new("Highlight", p.Character)
-            h.FillColor = Color3.fromRGB(255, 0, 0)
-         end
-      end
-   end,
-})
-
--- [ SCRIPTS ] --
-local function Load(url) loadstring(game:HttpGet(url))() end
-ScriptsTab:CreateButton({ Name = "Infinite Yield", Callback = function() Load('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source') end })
-ScriptsTab:CreateButton({ Name = "Dark Dex V3", Callback = function() Load("https://raw.githubusercontent.com/Babyhamsta/RBLX_Scripts/main/Universal/DarkDex.lua") end })
 
 Rayfield:LoadConfiguration()
