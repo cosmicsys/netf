@@ -1,0 +1,429 @@
+--// =========================================
+--//        Yero's Boost (FINAL)
+--//        FPS + Anti Lag + Save Config
+--// =========================================
+
+repeat task.wait() until game:IsLoaded()
+
+--// Services
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local Terrain = workspace:FindFirstChildOfClass("Terrain")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+--// Config
+local CONFIG_FILE = "YeroBoostConfig.json"
+
+local Settings = {
+	FPSBoost = false,
+	AntiLag = false,
+	AutoMode = false
+}
+
+--// Save / Load
+local HttpService = game:GetService("HttpService")
+
+local function SaveConfig()
+	if writefile then
+		writefile(CONFIG_FILE, HttpService:JSONEncode(Settings))
+	end
+end
+
+local function LoadConfig()
+	if readfile and isfile and isfile(CONFIG_FILE) then
+		local success, data = pcall(function()
+			return HttpService:JSONDecode(readfile(CONFIG_FILE))
+		end)
+
+		if success and data then
+			for i,v in pairs(data) do
+				Settings[i] = v
+			end
+		end
+	end
+end
+
+LoadConfig()
+
+--// Optimization Functions
+local function ApplyFPSBoost()
+	pcall(function()
+		settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+	end)
+
+	Lighting.GlobalShadows = false
+	Lighting.FogEnd = 9e9
+	Lighting.Brightness = 1
+	Lighting.ClockTime = 14
+
+	if Terrain then
+		Terrain.WaterWaveSize = 0
+		Terrain.WaterWaveSpeed = 0
+		Terrain.WaterReflectance = 0
+		Terrain.WaterTransparency = 1
+	end
+
+	for _,v in pairs(game:GetDescendants()) do
+		pcall(function()
+
+			if v:IsA("BasePart") then
+				v.Material = Enum.Material.Plastic
+				v.Reflectance = 0
+			end
+
+			if v:IsA("Decal")
+			or v:IsA("Texture") then
+				v:Destroy()
+			end
+
+			if v:IsA("ParticleEmitter")
+			or v:IsA("Trail") then
+				v.Enabled = false
+			end
+
+			if v:IsA("Explosion") then
+				v.BlastPressure = 0
+				v.BlastRadius = 0
+			end
+
+			if v:IsA("Fire")
+			or v:IsA("SpotLight")
+			or v:IsA("Smoke") then
+				v.Enabled = false
+			end
+		end)
+	end
+end
+
+local function ApplyAntiLag()
+	for _,obj in pairs(workspace:GetDescendants()) do
+		pcall(function()
+			if obj:IsA("MeshPart") then
+				obj.RenderFidelity = Enum.RenderFidelity.Performance
+			end
+
+			if obj:IsA("UnionOperation") then
+				obj.UsePartColor = true
+			end
+		end)
+	end
+end
+
+local function ApplyAutoMode()
+	ApplyFPSBoost()
+	ApplyAntiLag()
+end
+
+--// Auto Apply Loaded Config
+task.spawn(function()
+	task.wait(1)
+
+	if Settings.FPSBoost then
+		ApplyFPSBoost()
+	end
+
+	if Settings.AntiLag then
+		ApplyAntiLag()
+	end
+
+	if Settings.AutoMode then
+		ApplyAutoMode()
+	end
+end)
+
+--// UI
+local gui = Instance.new("ScreenGui")
+gui.Name = "YerosBoostUI"
+gui.ResetOnSpawn = false
+gui.Parent = game.CoreGui
+
+local main = Instance.new("Frame")
+main.Parent = gui
+main.Size = UDim2.new(0, 230, 0, 42)
+main.Position = UDim2.new(0.03, 0, 0.3, 0)
+main.BackgroundColor3 = Color3.fromRGB(15,15,15)
+main.BorderSizePixel = 0
+
+local corner = Instance.new("UICorner", main)
+corner.CornerRadius = UDim.new(0,12)
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Parent = main
+title.BackgroundTransparency = 1
+title.Size = UDim2.new(1,-40,1,0)
+title.Position = UDim2.new(0,10,0,0)
+title.Font = Enum.Font.GothamBold
+title.Text = "Yero's Boost"
+title.TextSize = 18
+title.TextColor3 = Color3.new(1,1,1)
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Expand Button
+local expand = Instance.new("TextButton")
+expand.Parent = main
+expand.Size = UDim2.new(0,30,0,30)
+expand.Position = UDim2.new(1,-35,0.5,-15)
+expand.Text = "+"
+expand.Font = Enum.Font.GothamBold
+expand.TextSize = 22
+expand.TextColor3 = Color3.new(1,1,1)
+expand.BackgroundColor3 = Color3.fromRGB(30,30,30)
+
+local ec = Instance.new("UICorner", expand)
+ec.CornerRadius = UDim.new(0,8)
+
+-- Menu
+local menu = Instance.new("Frame")
+menu.Parent = main
+menu.Visible = false
+menu.Size = UDim2.new(1,0,0,220)
+menu.Position = UDim2.new(0,0,1,5)
+menu.BackgroundColor3 = Color3.fromRGB(10,10,10)
+menu.BorderSizePixel = 0
+
+local mc = Instance.new("UICorner", menu)
+mc.CornerRadius = UDim.new(0,12)
+
+-- Layout
+local layout = Instance.new("UIListLayout", menu)
+layout.Padding = UDim.new(0,8)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local pad = Instance.new("UIPadding", menu)
+pad.PaddingTop = UDim.new(0,10)
+
+-- Button Creator
+local function CreateButton(text)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(0,200,0,35)
+	b.BackgroundColor3 = Color3.fromRGB(25,25,25)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	b.Text = text
+	b.Parent = menu
+
+	local bc = Instance.new("UICorner", b)
+	bc.CornerRadius = UDim.new(0,10)
+
+	return b
+end
+
+local fpsButton = CreateButton("FPS Boost : OFF")
+local lagButton = CreateButton("Anti Lag : OFF")
+local autoButton = CreateButton("Auto Mode : OFF")
+local saveButton = CreateButton("Save Config")
+
+-- Warning
+local warning = Instance.new("TextLabel")
+warning.Parent = menu
+warning.Size = UDim2.new(1,0,0,20)
+warning.BackgroundTransparency = 1
+warning.Text = "Auto Mode not recommended for low FPS"
+warning.Font = Enum.Font.Gotham
+warning.TextSize = 11
+warning.TextColor3 = Color3.fromRGB(180,180,180)
+
+-- Bottom Left Active Settings
+local active = Instance.new("Frame")
+active.Parent = gui
+active.Size = UDim2.new(0,240,0,140)
+active.Position = UDim2.new(0,10,1,-150)
+active.BackgroundTransparency = 1
+
+local activeLayout = Instance.new("UIListLayout", active)
+activeLayout.Padding = UDim.new(0,4)
+
+local function CreateTag(name)
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.new(0,180,0,28)
+	holder.BackgroundColor3 = Color3.fromRGB(20,20,20)
+	holder.BorderSizePixel = 0
+	holder.Parent = active
+	holder.Visible = false
+
+	local hc = Instance.new("UICorner", holder)
+	hc.CornerRadius = UDim.new(0,8)
+
+	local txt = Instance.new("TextLabel")
+	txt.Parent = holder
+	txt.BackgroundTransparency = 1
+	txt.Size = UDim2.new(1,-30,1,0)
+	txt.Position = UDim2.new(0,10,0,0)
+	txt.Text = name
+	txt.Font = Enum.Font.GothamBold
+	txt.TextSize = 13
+	txt.TextColor3 = Color3.new(1,1,1)
+	txt.TextXAlignment = Enum.TextXAlignment.Left
+
+	local close = Instance.new("TextButton")
+	close.Parent = holder
+	close.Size = UDim2.new(0,20,0,20)
+	close.Position = UDim2.new(1,-25,0.5,-10)
+	close.Text = "X"
+	close.Font = Enum.Font.GothamBold
+	close.TextSize = 12
+	close.TextColor3 = Color3.new(1,1,1)
+	close.BackgroundColor3 = Color3.fromRGB(40,40,40)
+
+	local cc = Instance.new("UICorner", close)
+	cc.CornerRadius = UDim.new(1,0)
+
+	return holder, close
+end
+
+local fpsTag, fpsClose = CreateTag("FPS Boost Enabled")
+local lagTag, lagClose = CreateTag("Anti Lag Enabled")
+local autoTag, autoClose = CreateTag("Auto Mode Enabled")
+
+-- FPS Counter
+local fpsCounter = Instance.new("TextLabel")
+fpsCounter.Parent = gui
+fpsCounter.Size = UDim2.new(0,100,0,30)
+fpsCounter.Position = UDim2.new(1,-110,0,10)
+fpsCounter.BackgroundColor3 = Color3.fromRGB(15,15,15)
+fpsCounter.TextColor3 = Color3.new(1,1,1)
+fpsCounter.Font = Enum.Font.GothamBold
+fpsCounter.TextSize = 14
+fpsCounter.Text = "FPS: 0"
+
+local fcorner = Instance.new("UICorner", fpsCounter)
+fcorner.CornerRadius = UDim.new(0,10)
+
+local frames = 0
+local last = tick()
+
+RunService.RenderStepped:Connect(function()
+	frames += 1
+
+	if tick() - last >= 1 then
+		fpsCounter.Text = "FPS: "..tostring(frames)
+		frames = 0
+		last = tick()
+	end
+end)
+
+-- Update UI
+local function Refresh()
+	fpsButton.Text = "FPS Boost : "..(Settings.FPSBoost and "ON" or "OFF")
+	lagButton.Text = "Anti Lag : "..(Settings.AntiLag and "ON" or "OFF")
+	autoButton.Text = "Auto Mode : "..(Settings.AutoMode and "ON" or "OFF")
+
+	fpsTag.Visible = Settings.FPSBoost
+	lagTag.Visible = Settings.AntiLag
+	autoTag.Visible = Settings.AutoMode
+end
+
+Refresh()
+
+-- Expand
+expand.MouseButton1Click:Connect(function()
+	menu.Visible = not menu.Visible
+	expand.Text = menu.Visible and "-" or "+"
+end)
+
+-- FPS Boost
+fpsButton.MouseButton1Click:Connect(function()
+	Settings.FPSBoost = not Settings.FPSBoost
+
+	if Settings.FPSBoost then
+		ApplyFPSBoost()
+	end
+
+	Refresh()
+end)
+
+-- Anti Lag
+lagButton.MouseButton1Click:Connect(function()
+	Settings.AntiLag = not Settings.AntiLag
+
+	if Settings.AntiLag then
+		ApplyAntiLag()
+	end
+
+	Refresh()
+end)
+
+-- Auto Mode
+autoButton.MouseButton1Click:Connect(function()
+	Settings.AutoMode = not Settings.AutoMode
+
+	if Settings.AutoMode then
+		ApplyAutoMode()
+	end
+
+	Refresh()
+end)
+
+-- Save
+saveButton.MouseButton1Click:Connect(function()
+	SaveConfig()
+	saveButton.Text = "Saved!"
+
+	task.wait(1)
+
+	saveButton.Text = "Save Config"
+end)
+
+-- Close Tags
+fpsClose.MouseButton1Click:Connect(function()
+	Settings.FPSBoost = false
+	fpsTag.Visible = false
+	Refresh()
+end)
+
+lagClose.MouseButton1Click:Connect(function()
+	Settings.AntiLag = false
+	lagTag.Visible = false
+	Refresh()
+end)
+
+autoClose.MouseButton1Click:Connect(function()
+	Settings.AutoMode = false
+	autoTag.Visible = false
+	Refresh()
+end)
+
+-- Dragging
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+main.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = main.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+main.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+
+		main.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
