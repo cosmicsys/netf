@@ -19,7 +19,7 @@ local EverythingElseTab = Window:CreateTab("Everything Else", 4483362458)
 -- Global States
 local States = {
     AimlockEnabled = false,
-    AimlockSmoothness = 0.1, -- Lower = Faster for Aimlock
+    AimlockSmoothness = 0.1,
     AimlockFOV = 150,
     ShowFOV = false,
     LockPosition = Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y / 2),
@@ -29,6 +29,9 @@ local States = {
     TweenSpeed = 300,
     LastNotification = 0
 }
+
+-- Target Variable for Sticky Lock
+local CurrentTarget = nil
 
 -- References
 local Players = game:GetService("Players")
@@ -53,25 +56,32 @@ FOVCircle.Filled = false
 FOVCircle.Transparency = 0.5
 FOVCircle.Visible = false
 
--- [ UTILITY FUNCTIONS ] --
-local function GetClosestPlayer()
+-- [ IMPROVED TARGET SELECTION ] --
+local function GetNearestPlayer()
     local target = nil
-    local dist = States.AimlockFOV
+    local shortestDist = math.huge
     local center = States.LockPosition
 
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
-            local pos, onScreen = Camera:WorldToViewportPoint(p.Character.Head.Position)
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+            local headPos = p.Character.Head.Position
+            local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
+            
             if onScreen then
-                local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                if d < dist then
-                    target = p
-                    dist = d
+                -- Check if inside FOV first
+                local fovDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                if fovDist <= States.AimlockFOV then
+                    -- Select by physical 3D distance for "Nearest" feel
+                    local physicalDist = (LocalPlayer.Character.HumanoidRootPart.Position - headPos).Magnitude
+                    if physicalDist < shortestDist then
+                        target = p
+                        shortestDist = physicalDist
+                    end
                 end
             end
         end
     end
-    return target, dist
+    return target
 end
 
 local function TweenTo(targetPos)
@@ -99,24 +109,33 @@ RunService.RenderStepped:Connect(function()
     FOVCircle.Radius = States.AimlockFOV
     FOVCircle.Position = States.LockPosition
 
-    -- Elite Aimlock Execution (Camera CFrame Manipulation)
-    if States.AimlockEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        local target = GetClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local targetPos = target.Character.Head.Position
-            -- Smooth Aimlock Lerp
-            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 1 - States.AimlockSmoothness)
+    -- Elite Aimlock Execution
+    if States.AimlockEnabled then
+        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+            -- Acquire target if we don't have one
+            if not CurrentTarget or not CurrentTarget.Character or not CurrentTarget.Character:FindFirstChild("Head") or CurrentTarget.Character.Humanoid.Health <= 0 then
+                CurrentTarget = GetNearestPlayer()
+            end
+            
+            -- Lock onto target
+            if CurrentTarget and CurrentTarget.Character and CurrentTarget.Character:FindFirstChild("Head") then
+                local targetPos = CurrentTarget.Character.Head.Position
+                Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 1 - States.AimlockSmoothness)
+            end
+        else
+            -- Reset target on key release (Stop sticking)
+            CurrentTarget = nil
         end
     end
 
     -- Anti-Die Logic
     if States.AntiDie and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         if LocalPlayer.Character.Humanoid.Health < 3000 then
-            local closest, dist = GetClosestPlayer()
-            if closest and dist < 100 then
-                local escapePos = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(math.random(200, 400), 50, math.random(200, 400))
+            local closest = GetNearestPlayer()
+            if closest then
+                local escapePos = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(math.random(200, 400), 100, math.random(200, 400))
                 LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(escapePos)
-                Rayfield:Notify({Title = "Anti-Die", Content = "Health Critical! Locked away to safety.", Duration = 3})
+                Rayfield:Notify({Title = "Anti-Die", Content = "Health Critical! Auto-Escape active.", Duration = 3})
             end
         end
     end
@@ -130,7 +149,7 @@ RunService.RenderStepped:Connect(function()
                 if health < 5000 and dist < 1000 then
                     States.LastNotification = tick()
                     Rayfield:Notify({
-                        Title = "Target Vulnerable",
+                        Title = "Finish Him!",
                         Content = p.Name .. " is low! (" .. math.floor(health) .. " HP). Distance: " .. math.floor(dist),
                         Duration = 8,
                         Actions = {
@@ -146,7 +165,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- [ AIMLOCK TAB ] --
-AimlockTab:CreateSection("Core Logic")
+AimlockTab:CreateSection("Core Mechanics")
 
 AimlockTab:CreateToggle({
    Name = "Enable Elite Aimlock",
@@ -159,11 +178,11 @@ AimlockTab:CreateButton({
    Callback = function() 
        States.CenterLocked = not States.CenterLocked
        Crosshair.Color = States.CenterLocked and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-       Rayfield:Notify({Title = "Aimlock", Content = States.CenterLocked and "Center Position Locked!" or "Center Unlocked", Duration = 2})
+       Rayfield:Notify({Title = "Aimlock", Content = States.CenterLocked and "Center Locked!" or "Center following Mouse", Duration = 2})
    end,
 })
 
-AimlockTab:CreateSection("Fine Tuning")
+AimlockTab:CreateSection("Settings")
 
 AimlockTab:CreateToggle({
    Name = "Show FOV Circle",
@@ -172,7 +191,7 @@ AimlockTab:CreateToggle({
 })
 
 AimlockTab:CreateSlider({
-   Name = "Aimlock FOV",
+   Name = "Target FOV",
    Range = {10, 800},
    Increment = 10,
    CurrentValue = 150,
@@ -180,7 +199,7 @@ AimlockTab:CreateSlider({
 })
 
 AimlockTab:CreateSlider({
-   Name = "Smoothness (0 = Instant)",
+   Name = "Smoothness",
    Range = {0, 0.9},
    Increment = 0.01,
    CurrentValue = 0.1,
@@ -205,7 +224,7 @@ EverythingElseTab:CreateButton({
                v.Enabled = false
            end
        end
-       Rayfield:Notify({Title = "Performance", Content = "Optimization Complete.", Duration = 3})
+       Rayfield:Notify({Title = "Performance", Content = "Optimization applied.", Duration = 3})
    end,
 })
 
@@ -218,7 +237,7 @@ EverythingElseTab:CreateToggle({
 })
 
 EverythingElseTab:CreateToggle({
-   Name = "Health ESP (HP/Color)",
+   Name = "Dynamic Health ESP",
    CurrentValue = false,
    Callback = function(v)
        States.HealthESP = v
@@ -257,7 +276,7 @@ EverythingElseTab:CreateToggle({
    end,
 })
 
-EverythingElseTab:CreateSection("Misc")
+EverythingElseTab:CreateSection("Utility")
 
 EverythingElseTab:CreateButton({
    Name = "Infinite Yield",
