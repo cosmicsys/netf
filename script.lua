@@ -13,17 +13,17 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- Two Tabs
-local AimbotTab = Window:CreateTab("Aimbot", 4483362458)
+local AimlockTab = Window:CreateTab("Aimlock", 4483362458)
 local EverythingElseTab = Window:CreateTab("Everything Else", 4483362458)
 
 -- Global States
 local States = {
-    AimbotEnabled = false,
-    AimbotSmoothness = 1,
-    AimbotFOV = 150,
+    AimlockEnabled = false,
+    AimlockSmoothness = 0.1, -- Lower = Faster for Aimlock
+    AimlockFOV = 150,
     ShowFOV = false,
     LockPosition = Vector2.new(workspace.CurrentCamera.ViewportSize.X / 2, workspace.CurrentCamera.ViewportSize.Y / 2),
-    AimbotLocked = false,
+    CenterLocked = false,
     AntiDie = false,
     HealthESP = false,
     TweenSpeed = 300,
@@ -56,12 +56,12 @@ FOVCircle.Visible = false
 -- [ UTILITY FUNCTIONS ] --
 local function GetClosestPlayer()
     local target = nil
-    local dist = States.AimbotFOV
+    local dist = States.AimlockFOV
     local center = States.LockPosition
 
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
+            local pos, onScreen = Camera:WorldToViewportPoint(p.Character.Head.Position)
             if onScreen then
                 local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                 if d < dist then
@@ -87,43 +87,41 @@ end
 
 -- [ MAIN LOOP ] --
 RunService.RenderStepped:Connect(function()
-    -- Crosshair Logic
-    Crosshair.Visible = States.AimbotEnabled
-    if States.AimbotEnabled and not States.AimbotLocked then
+    -- Crosshair & Center Logic
+    Crosshair.Visible = States.AimlockEnabled
+    if States.AimlockEnabled and not States.CenterLocked then
         States.LockPosition = UserInputService:GetMouseLocation()
     end
     Crosshair.Position = States.LockPosition
     
     -- FOV Logic
     FOVCircle.Visible = States.ShowFOV
-    FOVCircle.Radius = States.AimbotFOV
+    FOVCircle.Radius = States.AimlockFOV
     FOVCircle.Position = States.LockPosition
 
-    -- Aimbot Execution
-    if States.AimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+    -- Elite Aimlock Execution (Camera CFrame Manipulation)
+    if States.AimlockEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local target = GetClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            local targetPos = Camera:WorldToViewportPoint(target.Character.HumanoidRootPart.Position)
-            mousemoverel(
-                (targetPos.X - States.LockPosition.X) / States.AimbotSmoothness, 
-                (targetPos.Y - States.LockPosition.Y) / States.AimbotSmoothness
-            )
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local targetPos = target.Character.Head.Position
+            -- Smooth Aimlock Lerp
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 1 - States.AimlockSmoothness)
         end
     end
 
     -- Anti-Die Logic
     if States.AntiDie and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         if LocalPlayer.Character.Humanoid.Health < 3000 then
-            local _, dist = GetClosestPlayer()
-            if dist < 100 then
-                local escapePos = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(300, 50, 300)
+            local closest, dist = GetClosestPlayer()
+            if closest and dist < 100 then
+                local escapePos = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(math.random(200, 400), 50, math.random(200, 400))
                 LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(escapePos)
-                Rayfield:Notify({Title = "Anti-Die", Content = "Low Health! Escape triggered.", Duration = 3})
+                Rayfield:Notify({Title = "Anti-Die", Content = "Health Critical! Locked away to safety.", Duration = 3})
             end
         end
     end
 
-    -- Intelligent Notifications
+    -- Intelligent Kill Notifications
     if tick() - States.LastNotification > 10 then
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") then
@@ -132,7 +130,7 @@ RunService.RenderStepped:Connect(function()
                 if health < 5000 and dist < 1000 then
                     States.LastNotification = tick()
                     Rayfield:Notify({
-                        Title = "Kill Opportunity",
+                        Title = "Target Vulnerable",
                         Content = p.Name .. " is low! (" .. math.floor(health) .. " HP). Distance: " .. math.floor(dist),
                         Duration = 8,
                         Actions = {
@@ -147,50 +145,50 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- [ AIMBOT TAB ] --
-AimbotTab:CreateSection("Targeting")
+-- [ AIMLOCK TAB ] --
+AimlockTab:CreateSection("Core Logic")
 
-AimbotTab:CreateToggle({
-   Name = "Enable Aimbot & Crosshair",
+AimlockTab:CreateToggle({
+   Name = "Enable Elite Aimlock",
    CurrentValue = false,
-   Callback = function(v) States.AimbotEnabled = v end,
+   Callback = function(v) States.AimlockEnabled = v end,
 })
 
-AimbotTab:CreateButton({
-   Name = "Lock/Unlock Center Position",
+AimlockTab:CreateButton({
+   Name = "Lock Aim Center (Crosshair)",
    Callback = function() 
-       States.AimbotLocked = not States.AimbotLocked
-       Crosshair.Color = States.AimbotLocked and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-       Rayfield:Notify({Title = "Combat", Content = States.AimbotLocked and "Aimbot Center Locked!" or "Center following Mouse", Duration = 2})
+       States.CenterLocked = not States.CenterLocked
+       Crosshair.Color = States.CenterLocked and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+       Rayfield:Notify({Title = "Aimlock", Content = States.CenterLocked and "Center Position Locked!" or "Center Unlocked", Duration = 2})
    end,
 })
 
-AimbotTab:CreateSection("Adjustments")
+AimlockTab:CreateSection("Fine Tuning")
 
-AimbotTab:CreateToggle({
-   Name = "Show FOV Radius",
+AimlockTab:CreateToggle({
+   Name = "Show FOV Circle",
    CurrentValue = false,
    Callback = function(v) States.ShowFOV = v end,
 })
 
-AimbotTab:CreateSlider({
-   Name = "FOV Radius",
+AimlockTab:CreateSlider({
+   Name = "Aimlock FOV",
    Range = {10, 800},
    Increment = 10,
    CurrentValue = 150,
-   Callback = function(v) States.AimbotFOV = v end,
+   Callback = function(v) States.AimlockFOV = v end,
 })
 
-AimbotTab:CreateSlider({
-   Name = "Smoothness",
-   Range = {1, 10},
-   Increment = 0.1,
-   CurrentValue = 1,
-   Callback = function(v) States.AimbotSmoothness = v end,
+AimlockTab:CreateSlider({
+   Name = "Smoothness (0 = Instant)",
+   Range = {0, 0.9},
+   Increment = 0.01,
+   CurrentValue = 0.1,
+   Callback = function(v) States.AimlockSmoothness = v end,
 })
 
 -- [ EVERYTHING ELSE TAB ] --
-EverythingElseTab:CreateSection("Performance & Optimization")
+EverythingElseTab:CreateSection("Performance")
 
 EverythingElseTab:CreateButton({
    Name = "Anti-Lag (FPS Booster)",
@@ -207,42 +205,20 @@ EverythingElseTab:CreateButton({
                v.Enabled = false
            end
        end
-       Rayfield:Notify({Title = "Performance", Content = "Engine optimized for max FPS.", Duration = 3})
+       Rayfield:Notify({Title = "Performance", Content = "Optimization Complete.", Duration = 3})
    end,
 })
 
-EverythingElseTab:CreateButton({
-   Name = "Anti-AFK",
-   Callback = function()
-      local virtualUser = game:GetService("VirtualUser")
-      LocalPlayer.Idled:Connect(function()
-         virtualUser:CaptureController()
-         virtualUser:ClickButton2(Vector2.new())
-      end)
-      Rayfield:Notify({Title = "Active", Content = "Anti-AFK enabled.", Duration = 3})
-   end,
-})
-
-EverythingElseTab:CreateSection("Survival")
+EverythingElseTab:CreateSection("Survival & Visuals")
 
 EverythingElseTab:CreateToggle({
-   Name = "Anti-Die (3000 HP Trigger)",
+   Name = "Anti-Die (Auto-TP)",
    CurrentValue = false,
    Callback = function(v) States.AntiDie = v end,
 })
 
-EverythingElseTab:CreateSlider({
-   Name = "Tween Speed",
-   Range = {100, 1000},
-   Increment = 50,
-   CurrentValue = 300,
-   Callback = function(v) States.TweenSpeed = v end,
-})
-
-EverythingElseTab:CreateSection("Visuals")
-
 EverythingElseTab:CreateToggle({
-   Name = "Dynamic Health ESP",
+   Name = "Health ESP (HP/Color)",
    CurrentValue = false,
    Callback = function(v)
        States.HealthESP = v
@@ -281,11 +257,22 @@ EverythingElseTab:CreateToggle({
    end,
 })
 
-EverythingElseTab:CreateSection("External Scripts")
+EverythingElseTab:CreateSection("Misc")
 
 EverythingElseTab:CreateButton({
    Name = "Infinite Yield",
    Callback = function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end,
+})
+
+EverythingElseTab:CreateButton({
+   Name = "Anti-AFK",
+   Callback = function()
+      local virtualUser = game:GetService("VirtualUser")
+      LocalPlayer.Idled:Connect(function()
+         virtualUser:CaptureController()
+         virtualUser:ClickButton2(Vector2.new())
+      end)
+   end,
 })
 
 Rayfield:LoadConfiguration()
