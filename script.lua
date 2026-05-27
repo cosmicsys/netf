@@ -12,11 +12,9 @@ local Window = Rayfield:CreateWindow({
    KeySystem = false
 })
 
--- Tabs
-local CombatTab = Window:CreateTab("Elite Combat", 4483362458)
-local SurvivalTab = Window:CreateTab("Survival", 4483362458)
-local VisualsTab = Window:CreateTab("Visuals", 4483362458)
-local UtilityTab = Window:CreateTab("Utility", 4483362458)
+-- Two Tabs
+local AimbotTab = Window:CreateTab("Aimbot", 4483362458)
+local EverythingElseTab = Window:CreateTab("Everything Else", 4483362458)
 
 -- Global States
 local States = {
@@ -59,8 +57,6 @@ FOVCircle.Visible = false
 local function GetClosestPlayer()
     local target = nil
     local dist = States.AimbotFOV
-    
-    -- Target relative to crosshair position
     local center = States.LockPosition
 
     for _, p in pairs(Players:GetPlayers()) do
@@ -108,7 +104,6 @@ RunService.RenderStepped:Connect(function()
         local target = GetClosestPlayer()
         if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
             local targetPos = Camera:WorldToViewportPoint(target.Character.HumanoidRootPart.Position)
-            -- Aimbot relative to the chosen center (LockPosition)
             mousemoverel(
                 (targetPos.X - States.LockPosition.X) / States.AimbotSmoothness, 
                 (targetPos.Y - States.LockPosition.Y) / States.AimbotSmoothness
@@ -119,7 +114,7 @@ RunService.RenderStepped:Connect(function()
     -- Anti-Die Logic
     if States.AntiDie and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         if LocalPlayer.Character.Humanoid.Health < 3000 then
-            local _, dist = GetClosestPlayer() -- Re-using check for closest player
+            local _, dist = GetClosestPlayer()
             if dist < 100 then
                 local escapePos = LocalPlayer.Character.HumanoidRootPart.Position + Vector3.new(300, 50, 300)
                 LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(escapePos)
@@ -152,16 +147,16 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- [ ELITE COMBAT TAB ] --
-CombatTab:CreateSection("Targeting")
+-- [ AIMBOT TAB ] --
+AimbotTab:CreateSection("Targeting")
 
-CombatTab:CreateToggle({
+AimbotTab:CreateToggle({
    Name = "Enable Aimbot & Crosshair",
    CurrentValue = false,
    Callback = function(v) States.AimbotEnabled = v end,
 })
 
-CombatTab:CreateButton({
+AimbotTab:CreateButton({
    Name = "Lock/Unlock Center Position",
    Callback = function() 
        States.AimbotLocked = not States.AimbotLocked
@@ -170,15 +165,15 @@ CombatTab:CreateButton({
    end,
 })
 
-CombatTab:CreateSection("Adjustments")
+AimbotTab:CreateSection("Adjustments")
 
-CombatTab:CreateToggle({
+AimbotTab:CreateToggle({
    Name = "Show FOV Radius",
    CurrentValue = false,
    Callback = function(v) States.ShowFOV = v end,
 })
 
-CombatTab:CreateSlider({
+AimbotTab:CreateSlider({
    Name = "FOV Radius",
    Range = {10, 800},
    Increment = 10,
@@ -186,7 +181,7 @@ CombatTab:CreateSlider({
    Callback = function(v) States.AimbotFOV = v end,
 })
 
-CombatTab:CreateSlider({
+AimbotTab:CreateSlider({
    Name = "Smoothness",
    Range = {1, 10},
    Increment = 0.1,
@@ -194,14 +189,16 @@ CombatTab:CreateSlider({
    Callback = function(v) States.AimbotSmoothness = v end,
 })
 
--- [ SURVIVAL TAB ] --
-SurvivalTab:CreateToggle({
+-- [ EVERYTHING ELSE TAB ] --
+EverythingElseTab:CreateSection("Survival")
+
+EverythingElseTab:CreateToggle({
    Name = "Anti-Die (3000 HP Trigger)",
    CurrentValue = false,
    Callback = function(v) States.AntiDie = v end,
 })
 
-SurvivalTab:CreateSlider({
+EverythingElseTab:CreateSlider({
    Name = "Tween Speed",
    Range = {100, 1000},
    Increment = 50,
@@ -209,8 +206,9 @@ SurvivalTab:CreateSlider({
    Callback = function(v) States.TweenSpeed = v end,
 })
 
--- [ VISUALS TAB ] --
-VisualsTab:CreateToggle({
+EverythingElseTab:CreateSection("Visuals")
+
+EverythingElseTab:CreateToggle({
    Name = "Dynamic Health ESP",
    CurrentValue = false,
    Callback = function(v)
@@ -247,6 +245,24 @@ VisualsTab:CreateToggle({
                end
            end)
        end
+   end,
+})
+
+EverythingElseTab:CreateSection("Utility")
+
+EverythingElseTab:CreateButton({
+   Name = "Infinite Yield",
+   Callback = function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end,
+})
+
+EverythingElseTab:CreateButton({
+   Name = "Anti-AFK",
+   Callback = function()
+      local virtualUser = game:GetService("VirtualUser")
+      LocalPlayer.Idled:Connect(function()
+         virtualUser:CaptureController()
+         virtualUser:ClickButton2(Vector2.new())
+      end)
    end,
 })
 
